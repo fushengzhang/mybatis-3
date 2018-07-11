@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2017 the original author or authors.
+ *    Copyright 2009-2018 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -15,13 +15,13 @@
  */
 package org.apache.ibatis.mapping;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.reflection.property.PropertyTokenizer;
 import org.apache.ibatis.session.Configuration;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * An actual SQL String got from an {@link SqlSource} after having processed any dynamic content.
@@ -42,6 +42,9 @@ public class BoundSql {
   private final MetaObject metaParameters;
 
   public BoundSql(Configuration configuration, String sql, List<ParameterMapping> parameterMappings, Object parameterObject) {
+    Result result = FormatSql.formatSql(sql, parameterObject, parameterMappings);
+    sql = result.getSql();
+    parameterMappings = result.getParameterMappings();
     this.sql = sql;
     this.parameterMappings = parameterMappings;
     this.parameterObject = parameterObject;
@@ -73,4 +76,6 @@ public class BoundSql {
   public Object getAdditionalParameter(String name) {
     return metaParameters.getValue(name);
   }
+
+
 }
