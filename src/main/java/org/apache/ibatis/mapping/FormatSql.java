@@ -15,6 +15,8 @@
  */
 package org.apache.ibatis.mapping;
 
+import org.apache.ibatis.binding.MapperMethod;
+
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
@@ -32,17 +34,19 @@ import java.util.regex.Pattern;
  * 功能描述：对符合特定语法的sql进行格式操作，可以简化XML中标签的使用和优化Mybatis注解的使用
  * 语法描述：
  * 例如：传递一个参数值，我们可以写条件判断后边的sql是否拼接执行
- * #if(:[])
+ * #if(:[userName] != null){ and userName = "zhangsan"}-- 参数是一个对象
  */
 public class FormatSql {
 
     public static Result formatSql(String sql, Object parameterObject, List<ParameterMapping> parameterMappings) {
-        Result result = null;
         HashMap<String, ParameterMapping> map1 = new HashMap<>();
         for (ParameterMapping parameterMapping : parameterMappings) {
             map1.put(parameterMapping.getProperty(),parameterMapping);
         }
         Map parameterObjectToMap = Utils.objectToMap(parameterObject);
+        if (parameterObject != null && parameterObject instanceof MapperMethod.ParamMap && parameterObjectToMap.size() == 0) {
+            parameterObjectToMap = (MapperMethod.ParamMap) parameterObject;
+        }
         if (sql.contains("#if(")) { // 此处可以替换成正则表达式 #if(){}
             int i = appearNumber(sql, "#if\\(");
             ArrayList<String> strings = new ArrayList<>();
@@ -76,10 +80,10 @@ public class FormatSql {
             ScriptEngine engine = manager.getEngineByName("js");
             for (KeyValue keyValue : keyValues) {
                 String key = keyValue.getKey();
-                engine.put(key.substring(key.indexOf(":[") + 2, key.lastIndexOf("]")).trim(),
+                engine.put(key.substring(key.indexOf(":[") + 2, key.lastIndexOf("]")).trim().replace(".",""),
                         parameterObjectToMap.get(key.substring(key.indexOf(":[") + 2, key.lastIndexOf("]")).trim()));
                 try {
-                    boolean b = (boolean) engine.eval(key.replace(":[", "").replace("]", ""));
+                    boolean b = (boolean) engine.eval(key.replace(":[", "").replace("]", "").replace(".",""));
                     keyValue.setAddStr(b);
                     map.put(keyValue.getIndex(), keyValue);
                     if (!b) {
@@ -108,9 +112,10 @@ public class FormatSql {
                 parameterMappings.add(map1.get(s));
             }
             sql = stringBuffer.toString();
-            result = new Result(sql, parameterMappings);
+            System.out.println(sql);
+            return new Result(sql, parameterMappings);
         }
-        return result;
+        return new Result(sql, parameterMappings);
     }
 
     /**
@@ -134,6 +139,9 @@ public class FormatSql {
 class Utils {
     public static Map objectToMap(Object thisObj) {
         Map map = new HashMap();
+        if (thisObj == null) {
+            return map;
+        }
         Class c;
         try {
             c = Class.forName(thisObj.getClass().getName());
@@ -152,7 +160,14 @@ class Utils {
                             //将属性的第一个值转为小写
                             key = key.substring(0, 1).toLowerCase() + key.substring(1);
                             //将属性key,value放入对象
-                            map.put(key, value);
+                            Map map1 = objectToMap(value);
+                            if (map1.size() > 0) {
+                                for (Object o : map1.keySet()) {
+                                    map.put(key + "." + o, map1.get(o));
+                                }
+                            } else {
+                                map.put(key, value);
+                            }
                         }
                     } catch (Exception e) {
                         // TODO: handle exception
