@@ -80,13 +80,18 @@ public class FormatSql {
             ScriptEngine engine = manager.getEngineByName("js");
             for (KeyValue keyValue : keyValues) {
                 String key = keyValue.getKey();
-                engine.put(key.substring(key.indexOf(":[") + 2, key.lastIndexOf("]")).trim().replace(".",""),
-                        parameterObjectToMap.get(key.substring(key.indexOf(":[") + 2, key.lastIndexOf("]")).trim()));
+                String[] split = key.split(":\\[");
+                for (String s : split) {
+                    if (s.contains("]")) {
+                        engine.put(s.substring(0, s.lastIndexOf("]")).trim().replace(".", ""),
+                                parameterObjectToMap.get(s.substring(0, s.lastIndexOf("]")).trim()));
+                    }
+                }
                 try {
                     boolean b = (boolean) engine.eval(key.replace(":[", "").replace("]", "").replace(".",""));
                     keyValue.setAddStr(b);
                     map.put(keyValue.getIndex(), keyValue);
-                    if (!b) {
+                    if (!b) {  // 有点问题
                         map1.remove(key.substring(key.indexOf(":[") + 2, key.lastIndexOf("]")).trim());
                     }
                 } catch (ScriptException e) {
@@ -145,6 +150,10 @@ class Utils {
         Class c;
         try {
             c = Class.forName(thisObj.getClass().getName());
+            if(c == null || c.getPackage().getName().equals("java.lang")){ // 判断是否是基本类型，待优化
+                return map;
+            }
+            System.out.println(c.getPackage().toString());
             //获取所有的方法
             Method[] m = c.getMethods();
             for (int i = 0; i < m.length; i++) {   //获取方法名
